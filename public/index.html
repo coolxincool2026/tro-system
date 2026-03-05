@@ -445,6 +445,10 @@ async function showDetail(id) {
   try {
     const c = await get('/api/cases/' + id);
     $('modal-ttl').textContent = '案件 ' + c.case_number;
+    // 构建 CourtListener docket 链接
+    const clUrl = c.source_url || (c.docket_id ? 'https://www.courtlistener.com/docket/' + c.docket_id + '/' : '');
+    // 构建 PACER 直链（通过法院跳转）
+    const pacerUrl = c.court_id ? 'https://ecf.' + c.court_id + '.uscourts.gov/cgi-bin/DktRpt.pl?' + (c.docket_id||'') : '';
     $('modal-body').innerHTML = `
       <div class="detail-grid">
         <div class="d-item"><label>案件号</label><div class="v" style="font-family:'JetBrains Mono',monospace;color:var(--blue)">${c.case_number}</div></div>
@@ -457,12 +461,28 @@ async function showDetail(id) {
         <div class="d-item"><label>案件状态</label><div class="v"><span class="status-dot ${c.status}"></span>${SL[c.status]||c.status}</div></div>
       </div>
       <div class="detail-note">${c.case_name||'暂无详细描述'}</div>
-      ${c.source_url ? `<div style="margin:14px 0 0"><a href="${c.source_url}" target="_blank" rel="noopener" style="color:var(--blue);font-size:12px">🔗 在 CourtListener 查看完整案件文件 →</a></div>` : ''}
-      <div class="tip-box">💡 <strong style="color:var(--blue)">如何应对TRO？</strong> 收到冻结通知后请立即咨询跨境电商维权律师，在规定期限内提交 Motion to Dissolve TRO，可申请提供安全金方式解冻账户资金。</div>`;
+      <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px;">
+        ${clUrl ? `<a href="${clUrl}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:rgba(91,143,232,0.08);border:1px solid rgba(91,143,232,0.25);border-radius:10px;text-decoration:none;transition:all 0.2s;" onmouseover="this.style.background='rgba(91,143,232,0.15)'" onmouseout="this.style.background='rgba(91,143,232,0.08)'">
+          <span style="font-size:22px">📋</span>
+          <div>
+            <div style="color:#5b8fe8;font-weight:600;font-size:14px">在 CourtListener 查看完整 Docket →</div>
+            <div style="color:var(--text3);font-size:11px;margin-top:2px">包含法院文件列表、令状、听证记录等</div>
+          </div>
+        </a>` : '<div style="padding:14px 16px;background:var(--bg3);border-radius:10px;color:var(--text3);font-size:12px">暂无 Docket 链接</div>'}
+        <a href="https://www.courtlistener.com/?q=${encodeURIComponent(c.case_number)}&type=r" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);border-radius:10px;text-decoration:none;" onmouseover="this.style.background='rgba(200,169,110,0.15)'" onmouseout="this.style.background='rgba(200,169,110,0.08)'">
+          <span style="font-size:22px">🔍</span>
+          <div>
+            <div style="color:var(--accent);font-weight:600;font-size:14px">在 CourtListener 搜索此案件 →</div>
+            <div style="color:var(--text3);font-size:11px;margin-top:2px">按案件号全文检索</div>
+          </div>
+        </a>
+      </div>
+      <div class="tip-box" style="margin-top:14px">💡 <strong style="color:var(--blue)">如何应对TRO？</strong> 收到冻结通知后请立即咨询跨境电商维权律师，在规定期限内提交 Motion to Dissolve TRO，可申请提供安全金方式解冻账户资金。</div>`;
   } catch(e) {
     $('modal-body').innerHTML = `<div style="color:var(--red);padding:20px">加载失败: ${e.message}</div>`;
   }
 }
+function closeModal() { $('modal-bg').classList.remove('open'); }
 function closeModal() { $('modal-bg').classList.remove('open'); }
 
 // ── 倒计时 ────────────────────────────────────────
