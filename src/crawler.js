@@ -1,229 +1,146 @@
-const axios = require('axios');
-const db = require('./db');
+const axios = require(‘axios’);
+const db = require(’./db’);
 
-const BASE_URL = 'https://www.courtlistener.com/api/rest/v4';
-const TOKEN = process.env.COURTLISTENER_TOKEN || '6a08baeba8633cc5ea4d7a686236842e789fc8d6';
-
-const TARGET_COURTS = [
-  'ilnd', 'ilcd',           // Illinois（最多TRO）
-  'flsd', 'flmd',           // Florida
-  'nysd', 'nyed',           // New York
-  'cacd', 'cand',           // California
-  'txsd', 'txnd',           // Texas
-  'ohnd', 'wawd', 'gand', 'njd'
-];
+const BASE_URL = ‘https://www.courtlistener.com/api/rest/v4’;
+const TOKEN = process.env.COURTLISTENER_TOKEN;
 
 const COURT_STATE = {
-  ilnd:'IL',ilcd:'IL',ilsd:'IL',
-  flsd:'FL',flmd:'FL',flnd:'FL',
-  nysd:'NY',nyed:'NY',nynd:'NY',nywd:'NY',
-  cacd:'CA',caed:'CA',cand:'CA',casd:'CA',
-  txsd:'TX',txed:'TX',txnd:'TX',txwd:'TX',
-  ohnd:'OH',ohsd:'OH',
-  wawd:'WA',waed:'WA',
-  gand:'GA',gamd:'GA',
-  njd:'NJ',
+ilnd:‘IL’,ilcd:‘IL’,flsd:‘FL’,flmd:‘FL’,
+nysd:‘NY’,nyed:‘NY’,cacd:‘CA’,cand:‘CA’,
+txsd:‘TX’,txnd:‘TX’,ohnd:‘OH’,wawd:‘WA’,
+gand:‘GA’,njd:‘NJ’,
 };
 
 const KNOWN_BRANDS = [
-  'Nike','Louis Vuitton','Gucci','Chanel','Hermès','Prada','Rolex','Tiffany',
-  'Burberry','Coach','Michael Kors','Adidas','Under Armour','The North Face',
-  'Columbia','Patagonia','UGG','Birkenstock','Fear of God','BOSCH','Makita',
-  'DeWalt','3M','Apple','Samsung','Sony','Microsoft','Moose Knuckles','Lacoste',
-  'Tommy Hilfiger','Ralph Lauren','Oakley','Ray-Ban','Carhartt','Wolverine',
+‘Nike’,‘Louis Vuitton’,‘Gucci’,‘Chanel’,‘Hermes’,‘Prada’,‘Rolex’,‘Tiffany’,
+‘Burberry’,‘Coach’,‘Michael Kors’,‘Adidas’,‘Under Armour’,‘The North Face’,
+‘Columbia’,‘Patagonia’,‘UGG’,‘Birkenstock’,‘Fear of God’,‘BOSCH’,‘Makita’,
+‘DeWalt’,‘3M’,‘Apple’,‘Samsung’,‘Sony’,‘Lacoste’,‘Tommy Hilfiger’,
+‘Ralph Lauren’,‘Oakley’,‘Ray-Ban’,‘Carhartt’,‘Moose Knuckles’,
 ];
 
-const KNOWN_FIRMS = {
-  'GBC':    ['greer burns', 'greer, burns', 'GBC Law'],
-  'Keith':  ['keith szeliga', 'szeliga', 'IPLA'],
-  'TME':    ['markham group', 'TME'],
-  'HSP':    ['hong, severson', 'HSP'],
-  'Boies':  ['boies schiller'],
-  'Perkins':['perkins coie'],
-  'Winston':['winston & strawn'],
-  'Foley':  ['foley & lardner'],
-};
+const SEARCH_QUERIES = [
+‘temporary restraining order does defendants counterfeit’,
+‘“schedule A” defendants trademark counterfeit’,
+‘“john does” trademark infringement counterfeit sellers’,
+‘TRO counterfeit trademark “does 1”’,
+‘preliminary injunction counterfeit defendants online sellers’,
+];
 
 class TROCrawler {
-  constructor() {
-    this.headers = {
-      'Authorization': `Token ${TOKEN}`,
-      'Content-Type': 'application/json',
-    };
-    this.stats = { fetched: 0, inserted: 0, updated: 0, errors: 0 };
-    this.aborted = false;
-  }
+constructor() {
+this.headers = { ‘Authorization’: `Token ${TOKEN}`, ‘Content-Type’: ‘application/json’ };
+this.stats = { fetched: 0, inserted: 0, updated: 0, errors: 0 };
+this.aborted = false;
+this.seenIds = new Set();
+}
 
-  sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+abort() { this.aborted = true; }
 
-  abort() { this.aborted = true; }
+async fetchAll() {
+const dateFrom = new Date(Date.now() - 730 * 86400000).toISOString().split(‘T’)[0];
+console.log(`[Crawler] 全量抓取开始，起始日期: ${dateFrom}`);
+await this.searchByKeywords(dateFrom);
+console.log(`[Crawler] 全量完成: ${JSON.stringify(this.stats)}`);
+}
 
-  // ── 全量抓取（近2年）──────────────────────────────────────
-  async fetchAll() {
-    const dateFrom = new Date(Date.now() - 730 * 86400000).toISOString().split('T')[0];
-    console.log(`[Crawler] 全量抓取开始，起始日期: ${dateFrom}`);
-    for (const court of TARGET_COURTS) {
-      if (this.aborted) break;
-      await this.fetchCourtCases(court, dateFrom);
-      await this.sleep(400);
-    }
-    console.log(`[Crawler] 全量完成: ${JSON.stringify(this.stats)}`);
-  }
+async fetchIncremental() {
+const dateFrom = new Date(Date.now() - 3 * 86400000).toISOString().split(‘T’)[0];
+console.log(`[Crawler] 增量抓取，起始: ${dateFrom}`);
+await this.searchByKeywords(dateFrom);
+console.log(`[Crawler] 增量完成: ${JSON.stringify(this.stats)}`);
+this.stats = { fetched: 0, inserted: 0, updated: 0, errors: 0 };
+}
 
-  // ── 增量抓取（近48小时）──────────────────────────────────
-  async fetchIncremental() {
-    const dateFrom = new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0];
-    console.log(`[Crawler] 增量抓取，起始: ${dateFrom}`);
-    for (const court of TARGET_COURTS) {
-      if (this.aborted) break;
-      await this.fetchCourtCases(court, dateFrom);
-      await this.sleep(200);
-    }
-    console.log(`[Crawler] 增量完成: ${JSON.stringify(this.stats)}`);
-    this.stats = { fetched: 0, inserted: 0, updated: 0, errors: 0 };
-  }
+async searchByKeywords(dateFrom) {
+for (const q of SEARCH_QUERIES) {
+if (this.aborted) return;
+console.log(`[Crawler] 搜索: "${q}"`);
+await this.searchDockets(q, dateFrom);
+await this.sleep(1000);
+}
+}
 
-  // ── 按法院+日期抓取 ──────────────────────────────────────
-  async fetchCourtCases(courtId, dateFrom) {
-    // 同时抓商标(840)和版权(820)类案件
-    for (const nos of ['840', '820']) {
-      if (this.aborted) return;
-      let cursor = null;
-      let page = 0;
-      const maxPages = 20; // 每个法院每类最多20页=200条
+async searchDockets(query, dateFrom) {
+let page = 1;
+while (page <= 10) {
+if (this.aborted) return;
+try {
+const resp = await axios.get(`https://www.courtlistener.com/api/rest/v4/search/`, {
+headers: this.headers,
+params: { q: query, type: ‘r’, filed_after: dateFrom, order_by: ‘score desc’, page },
+timeout: 30000,
+});
+const results = resp.data.results || [];
+if (results.length === 0) break;
+console.log(`[Crawler] 第${page}页: ${results.length} 条`);
+for (const item of results) {
+const uid = item.docket_id || item.id;
+if (uid && this.seenIds.has(uid)) continue;
+if (uid) this.seenIds.add(uid);
+this.saveCase(item);
+}
+this.stats.fetched += results.length;
+page++;
+if (!resp.data.next) break;
+await this.sleep(500);
+} catch (err) {
+if (err.response?.status === 429) { await this.sleep(60000); continue; }
+if (err.response?.status === 401) { console.error(’[Crawler] Token无效！’); this.aborted = true; return; }
+console.error(`[Crawler] 错误: ${err.message}`);
+this.stats.errors++;
+break;
+}
+}
+}
 
-      while (page < maxPages) {
-        if (this.aborted) return;
-        try {
-          const params = {
-            court: courtId,
-            date_filed__gte: dateFrom,
-            nature_of_suit: nos,
-            order_by: '-date_filed',
-            ...(cursor ? { cursor } : {}),
-          };
+extractPlaintiff(caseName) {
+const m = caseName.match(/^(.+?)\s+vs?.?\s+/i);
+return (m ? m[1] : caseName).trim().substring(0, 150);
+}
 
-          const resp = await axios.get(`${BASE_URL}/dockets/`, {
-            headers: this.headers,
-            params,
-            timeout: 25000,
-          });
+extractBrand(caseName, plaintiff) {
+for (const b of KNOWN_BRANDS) {
+if (caseName.toLowerCase().includes(b.toLowerCase())) return b;
+}
+const short = plaintiff.replace(/,?\s*(inc.|llc|ltd|corp.?|co.|group|plc).*$/i, ‘’).trim();
+return short.length < 50 ? short : ‘待确认’;
+}
 
-          const { results, next } = resp.data;
-          if (!results || results.length === 0) break;
+getState(courtId) {
+return COURT_STATE[courtId] || (courtId || ‘’).substring(0, 2).toUpperCase() || ‘US’;
+}
 
-          for (const docket of results) {
-            if (this.isTROCase(docket)) {
-              this.saveCase(docket, courtId, nos);
-            }
-          }
-
-          this.stats.fetched += results.length;
-          page++;
-
-          if (!next) break;
-          cursor = new URL(next).searchParams.get('cursor');
-          await this.sleep(300); // 礼貌性延迟，避免触发限流
-
-        } catch (err) {
-          if (err.response?.status === 429) {
-            console.warn(`[Crawler] 限流！等待60秒... (${courtId}/${nos})`);
-            await this.sleep(60000);
-            continue;
-          }
-          if (err.response?.status === 401) {
-            console.error('[Crawler] Token无效，请检查 COURTLISTENER_TOKEN');
-            this.aborted = true;
-            return;
-          }
-          console.error(`[Crawler] 错误 [${courtId}/${nos} p${page}]: ${err.message}`);
-          this.stats.errors++;
-          break;
-        }
-      }
-    }
-  }
-
-  // ── TRO特征识别 ──────────────────────────────────────────
-  isTROCase(docket) {
-    const name = (docket.case_name || docket.case_name_short || '').toLowerCase();
-    // Doe Defendants 是TRO最强特征（卖家身份未知）
-    if (/\bdoes?\b/i.test(name)) return true;
-    if (/schedule\s+[a-z]/i.test(name)) return true;   // "Schedule A defendants"
-    if (/defendants?\s+\d+[-–]\d+/i.test(name)) return true;
-    if (/\d+\s+(unknown|identified)/i.test(name)) return true;
-    if (/counterfeit/i.test(name)) return true;
-    return false;
-  }
-
-  extractPlaintiff(caseName) {
-    const m = caseName.match(/^(.+?)\s+vs?\.?\s+/i);
-    return (m ? m[1] : caseName).trim().substring(0, 150);
-  }
-
-  extractBrand(caseName, plaintiff) {
-    for (const b of KNOWN_BRANDS) {
-      if (caseName.toLowerCase().includes(b.toLowerCase())) return b;
-    }
-    // 从原告名推断
-    const short = plaintiff.replace(/,?\s*(inc\.|llc|ltd|corp\.?|co\.|group).*$/i, '').trim();
-    return short.length < 50 ? short : '待确认';
-  }
-
-  detectFirm(text = '') {
-    const t = text.toLowerCase();
-    for (const [abbr, kws] of Object.entries(KNOWN_FIRMS)) {
-      if (kws.some(k => t.includes(k.toLowerCase()))) return abbr;
-    }
-    return '';
-  }
-
-  // ── 保存到 SQLite ─────────────────────────────────────────
-  saveCase(docket, courtId, nos) {
-    try {
-      const caseName = (docket.case_name || docket.case_name_short || '').substring(0, 500);
-      const plaintiff = this.extractPlaintiff(caseName);
-      const brand = this.extractBrand(caseName, plaintiff);
-      const state = COURT_STATE[courtId] || courtId.substring(0, 2).toUpperCase();
-      const status = docket.date_terminated ? 'closed' : 'active';
-      const caseNum = docket.docket_number || '';
-      const dateFiled = docket.date_filed || '';
-
-      if (!caseNum || !dateFiled) return;
-
-      const existing = db.queryOne(
-        'SELECT id FROM cases WHERE case_number=? AND court_id=?',
-        [caseNum, courtId]
-      );
-
-      if (existing) {
-        db.query(
-          `UPDATE cases SET status=?, updated_at=datetime('now') WHERE id=?`,
-          [status, existing.id]
-        );
-        this.stats.updated++;
-      } else {
-        db.query(
-          `INSERT OR IGNORE INTO cases
-           (case_number, case_name, plaintiff, state, court_id, law_firm, brand,
-            date_filed, nature_of_suit, status, defendant_count, source_url, docket_id)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-          [
-            caseNum, caseName, plaintiff, state, courtId, '',
-            brand, dateFiled, nos, status, 1,
-            `https://www.courtlistener.com${docket.absolute_url || ''}`,
-            docket.id || null,
-          ]
-        );
-        this.stats.inserted++;
-      }
-    } catch (err) {
-      if (!err.message.includes('UNIQUE')) {
-        console.error('[Crawler] save error:', err.message);
-        this.stats.errors++;
-      }
-    }
-  }
+saveCase(item) {
+try {
+const caseName = (item.caseName || item.case_name || ‘’).substring(0, 500);
+const courtId = item.court_id || item.court || ‘’;
+const caseNum = item.docketNumber || item.docket_number || ‘’;
+const dateFiled = item.dateFiled || item.date_filed || ‘’;
+const docketId = item.docket_id || item.id || null;
+if (!caseName || !dateFiled) return;
+const plaintiff = this.extractPlaintiff(caseName);
+const brand = this.extractBrand(caseName, plaintiff);
+const state = this.getState(courtId);
+const status = (item.dateTerminated || item.date_terminated) ? ‘closed’ : ‘active’;
+const sourceUrl = item.absolute_url ? `https://www.courtlistener.com${item.absolute_url}` : ‘’;
+const existing = db.queryOne(‘SELECT id FROM cases WHERE case_number=? AND court_id=?’, [caseNum, courtId]);
+if (existing) {
+db.query(`UPDATE cases SET status=?, updated_at=datetime('now') WHERE id=?`, [status, existing.id]);
+this.stats.updated++;
+} else {
+db.query(
+`INSERT OR IGNORE INTO cases (case_number,case_name,plaintiff,state,court_id,law_firm,brand,date_filed,nature_of_suit,status,defendant_count,source_url,docket_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+[caseNum,caseName,plaintiff,state,courtId,’’,brand,dateFiled,’’,status,1,sourceUrl,docketId]
+);
+this.stats.inserted++;
+if (this.stats.inserted % 50 === 0) console.log(`[Crawler] 已入库 ${this.stats.inserted} 条...`);
+}
+} catch (err) {
+if (!err.message.includes(‘UNIQUE’)) { console.error(’[Crawler] 保存失败:’, err.message); this.stats.errors++; }
+}
+}
 }
 
 module.exports = TROCrawler;
