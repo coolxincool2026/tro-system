@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>美国TRO案件查询 · 实时数据</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0c10;--bg2:#0f1218;--bg3:#141820;--border:#1e2530;--accent:#c8a96e;--accent2:#e8c88a;--red:#e05555;--green:#4caf80;--blue:#5b8fe8;--text:#d8dce8;--text2:#8a90a0;--text3:#5a6070;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Inter','Noto Serif SC',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(200,169,110,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(200,169,110,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+header{position:sticky;top:0;z-index:100;background:rgba(10,12,16,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);}
+.header-inner{max-width:1400px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 2rem;gap:2rem;}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none;}
+.logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+.logo-text{font-family:'Noto Serif SC',serif;font-size:18px;font-weight:700;color:var(--accent2);letter-spacing:.02em;}
+nav{display:flex;flex:1;justify-content:center;gap:2px;}
+nav a{color:var(--text2);text-decoration:none;font-size:13px;padding:6px 14px;border-radius:6px;transition:all .2s;white-space:nowrap;}
+nav a:hover,nav a.active{color:var(--accent2);background:rgba(200,169,110,.08);}
+.live-badge{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text3);white-space:nowrap;}
+.live-dot{width:7px;height:7px;background:var(--green);border-radius:50%;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(1.4);}}
+.syncing-badge{background:rgba(200,169,110,.12);color:var(--accent);border:1px solid rgba(200,169,110,.2);padding:3px 10px;border-radius:20px;font-size:11px;display:none;align-items:center;gap:5px;}
+.syncing-badge.show{display:flex;}
+.sync-spin{width:10px;height:10px;border:1.5px solid var(--accent);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;}
+
+.hero{position:relative;z-index:1;padding:2.5rem 2rem 1.5rem;max-width:1400px;margin:0 auto;}
+.hero-title{font-family:'Noto Serif SC',serif;font-size:clamp(22px,3vw,36px);font-weight:700;color:#fff;margin-bottom:6px;}
+.hero-title span{color:var(--accent);}
+.hero-sub{color:var(--text2);font-size:13px;margin-bottom:1.5rem;}
+
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:1.5rem;}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;position:relative;overflow:hidden;transition:border-color .3s;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),transparent);}
+.stat-card:hover{border-color:rgba(200,169,110,.3);}
+.stat-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;}
+.stat-value{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:500;color:var(--accent2);line-height:1;margin-bottom:3px;}
+.stat-sub{font-size:11px;color:var(--green);}
+
+.search-section{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px;}
+.search-row{display:flex;gap:10px;margin-bottom:10px;}
+.input-wrap{flex:1;position:relative;}
+.input-wrap svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none;}
+input[type=text],select{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:9px 13px 9px 36px;outline:none;transition:border-color .2s;font-family:inherit;-webkit-appearance:none;}
+select{padding-left:12px;cursor:pointer;}
+input:focus,select:focus{border-color:var(--accent);}
+.filter-row{display:flex;gap:8px;flex-wrap:wrap;}
+.filter-row select{width:auto;min-width:110px;}
+.btn{padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-family:inherit;transition:all .2s;font-weight:500;white-space:nowrap;}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px);}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2);}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+
+.layout{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:0 2rem 4rem;display:grid;grid-template-columns:1fr 290px;gap:16px;}
+.table-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.table-head-bar{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.table-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;}
+.badge{background:rgba(200,169,110,.15);color:var(--accent);font-size:11px;padding:2px 8px;border-radius:10px;font-family:'JetBrains Mono',monospace;}
+.timer-wrap{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text3);}
+.timer-bar{width:100px;height:2px;background:var(--bg3);border-radius:1px;overflow:hidden;}
+.timer-fill{height:100%;background:var(--green);transition:width 1s linear;}
+.timer-text{font-family:'JetBrains Mono',monospace;font-size:11px;white-space:nowrap;}
+
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{background:var(--bg3);padding:11px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;transition:color .2s;}
+thead th:hover{color:var(--accent);}
+thead th.sorted{color:var(--accent2);}
+tbody tr{border-bottom:1px solid rgba(30,37,48,.7);transition:background .15s;}
+tbody tr:hover{background:rgba(200,169,110,.04);}
+tbody td{padding:11px 14px;vertical-align:middle;}
+.date-cell{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2);white-space:nowrap;}
+.case-link{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--blue);cursor:pointer;white-space:nowrap;background:none;border:none;padding:0;transition:color .2s;}
+.case-link:hover{color:var(--accent2);text-decoration:underline;}
+.plaintiff-cell{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;}
+.state-pill{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;background:rgba(91,143,232,.12);color:var(--blue);border:1px solid rgba(91,143,232,.2);}
+.state-pill.IL{background:rgba(200,169,110,.1);color:var(--accent);border-color:rgba(200,169,110,.2);}
+.state-pill.FL{background:rgba(76,175,128,.1);color:var(--green);border-color:rgba(76,175,128,.2);}
+.state-pill.NY{background:rgba(91,143,232,.1);color:var(--blue);border-color:rgba(91,143,232,.2);}
+.state-pill.CA{background:rgba(224,85,85,.1);color:var(--red);border-color:rgba(224,85,85,.2);}
+.state-pill.TX{background:rgba(160,120,200,.1);color:#a078c8;border-color:rgba(160,120,200,.2);}
+.firm-pill{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;background:var(--bg3);color:var(--text2);border:1px solid var(--border);white-space:nowrap;}
+.firm-pill.GBC{color:#e8a060;border-color:rgba(232,160,96,.25);background:rgba(232,160,96,.08);}
+.firm-pill.Keith{color:var(--blue);border-color:rgba(91,143,232,.25);background:rgba(91,143,232,.08);}
+.firm-pill.TME{color:var(--green);border-color:rgba(76,175,128,.25);background:rgba(76,175,128,.08);}
+.firm-pill.HSP{color:#c080e0;border-color:rgba(192,128,224,.25);background:rgba(192,128,224,.08);}
+.brand-cell{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--accent);font-size:12px;}
+.status-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:5px;background:var(--green);}
+.status-dot.closed{background:var(--text3);}
+.status-dot.pending{background:var(--accent);}
+.tag-new{display:inline-block;padding:1px 4px;background:var(--accent);color:#000;border-radius:3px;font-size:8px;font-weight:700;margin-left:4px;vertical-align:middle;}
+
+.pager{padding:14px 18px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.pager-info{font-size:11px;color:var(--text3);}
+.pager-btns{display:flex;gap:4px;}
+.pager-btn{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-size:12px;transition:all .2s;display:flex;align-items:center;justify-content:center;font-family:inherit;}
+.pager-btn:hover,.pager-btn.active{background:rgba(200,169,110,.15);border-color:var(--accent);color:var(--accent);}
+.pager-btn:disabled{opacity:.3;cursor:default;}
+
+.sidebar{display:flex;flex-direction:column;gap:14px;}
+.side-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.side-head{padding:12px 14px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;}
+.side-body{padding:10px 14px;}
+.news-item{padding:9px 0;border-bottom:1px solid rgba(30,37,48,.5);cursor:pointer;transition:padding-left .2s;}
+.news-item:last-child{border-bottom:none;}
+.news-item:hover{padding-left:4px;}
+.news-date{font-size:9px;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-bottom:3px;}
+.news-title{font-size:11px;color:var(--text2);line-height:1.5;transition:color .2s;}
+.news-item:hover .news-title{color:var(--accent);}
+.rank-row{display:flex;align-items:center;padding:7px 0;border-bottom:1px solid rgba(30,37,48,.4);gap:6px;}
+.rank-row:last-child{border-bottom:none;}
+.rank-bar-wrap{flex:1;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;}
+.rank-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;}
+.rank-count{font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:10px;white-space:nowrap;}
+.rank-label{font-size:11px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px;}
+
+.empty-row td{padding:40px;text-align:center;color:var(--text3);font-size:13px;}
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:6px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(10px);z-index:1000;display:none;align-items:center;justify-content:center;padding:1.5rem;}
+.modal-bg.open{display:flex;}
+.modal{background:var(--bg2);border:1px solid rgba(200,169,110,.2);border-radius:16px;max-width:680px;width:100%;max-height:88vh;overflow-y:auto;animation:mIn .22s ease;}
+@keyframes mIn{from{opacity:0;transform:scale(.96) translateY(8px);}to{opacity:1;transform:scale(1) translateY(0);}}
+.modal-top{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--bg2);}
+.modal-ttl{font-family:'Noto Serif SC',serif;font-size:17px;font-weight:700;color:var(--accent2);}
+.modal-close{width:30px;height:30px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.modal-close:hover{background:var(--bg3);}
+.modal-body{padding:22px;}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;}
+.d-item label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);display:block;margin-bottom:5px;}
+.d-item .v{font-size:13px;color:var(--text);font-weight:500;}
+.detail-note{background:var(--bg3);border-radius:8px;padding:14px;font-size:12px;color:var(--text2);line-height:1.8;border-left:3px solid var(--accent);word-break:break-word;}
+.tip-box{margin-top:14px;padding:12px 14px;background:rgba(91,143,232,.07);border-radius:8px;font-size:12px;color:var(--text2);border:1px solid rgba(91,143,232,.15);}
+
+.toast{position:fixed;bottom:22px;right:22px;background:var(--bg2);border:1px solid var(--green);border-radius:10px;padding:11px 16px;font-size:12px;color:var(--green);z-index:2000;transform:translateY(70px);opacity:0;transition:all .3s ease;display:flex;align-items:center;gap:7px;}
+.toast.show{transform:translateY(0);opacity:1;}
+
+@media(max-width:1100px){.layout{grid-template-columns:1fr;}.sidebar{display:grid;grid-template-columns:1fr 1fr;}.stats-bar{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:640px){nav{display:none;}.sidebar{grid-template-columns:1fr;}.search-row{flex-direction:column;}.detail-grid{grid-template-columns:1fr;}.stats-bar{grid-template-columns:1fr 1fr;}.timer-bar{width:60px;}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a href="/" class="logo">
+      <div class="logo-icon">⚖</div>
+      <span class="logo-text">TRO案件查询</span>
+    </a>
+    <nav>
+      <a href="#" class="active">实时案件</a>
+      <a href="#">年度列表</a>
+      <a href="#">侵权品牌</a>
+      <a href="#">原告律所</a>
+      <a href="#">侵权资讯</a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="syncing-badge" id="syncing-badge">
+        <div class="sync-spin"></div>正在同步数据
+      </div>
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        <span id="last-update">连接中...</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="hero">
+  <h1 class="hero-title">美国 <span>TRO</span> 临时限制令案件查询</h1>
+  <p class="hero-sub">收录 2024–2026 年美国联邦法院 TRO 诉讼数据 · 数据来源 CourtListener/PACER · 每30分钟自动同步</p>
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">今日新增</div>
+      <div class="stat-value" id="s-today">—</div>
+      <div class="stat-sub">实时统计</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">本月案件</div>
+      <div class="stat-value" id="s-month">—</div>
+      <div class="stat-sub">持续更新</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">数据库总量</div>
+      <div class="stat-value" id="s-total">—</div>
+      <div class="stat-sub">近两年全量</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">下次更新</div>
+      <div class="stat-value" id="s-next">30:00</div>
+      <div class="stat-sub">自动刷新</div>
+    </div>
+  </div>
+  <div class="search-section">
+    <div class="search-row">
+      <div class="input-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" id="q" placeholder="搜索案件号、原告名、品牌、律所...">
+      </div>
+      <button class="btn btn-primary" onclick="search()">搜索</button>
+      <button class="btn btn-ghost" onclick="reset()">重置</button>
+    </div>
+    <div class="filter-row">
+      <select id="f-year" onchange="search()">
+        <option value="">全部年份</option>
+        <option value="2026">2026年</option>
+        <option value="2025">2025年</option>
+        <option value="2024">2024年</option>
+      </select>
+      <select id="f-state" onchange="search()">
+        <option value="">全部州</option>
+        <option value="IL">IL · 伊利诺伊</option>
+        <option value="FL">FL · 佛罗里达</option>
+        <option value="NY">NY · 纽约</option>
+        <option value="CA">CA · 加利福尼亚</option>
+        <option value="TX">TX · 德克萨斯</option>
+        <option value="OH">OH · 俄亥俄</option>
+        <option value="WA">WA · 华盛顿</option>
+        <option value="NJ">NJ · 新泽西</option>
+        <option value="GA">GA · 佐治亚</option>
+      </select>
+      <select id="f-firm" onchange="search()">
+        <option value="">全部律所</option>
+        <option value="GBC">GBC</option>
+        <option value="Keith">Keith</option>
+        <option value="TME">TME</option>
+        <option value="HSP">HSP</option>
+        <option value="Boies">Boies</option>
+      </select>
+      <select id="f-status" onchange="search()">
+        <option value="">全部状态</option>
+        <option value="active">进行中</option>
+        <option value="closed">已结案</option>
+      </select>
+      <select id="f-limit" onchange="changeLimit()">
+        <option value="20">20条/页</option>
+        <option value="50">50条/页</option>
+        <option value="100">100条/页</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <div>
+    <div class="table-card">
+      <div class="table-head-bar">
+        <div class="table-title">
+          案件列表
+          <span class="badge" id="case-count">—</span>
+        </div>
+        <div class="timer-wrap">
+          <span>下次更新</span>
+          <div class="timer-bar"><div class="timer-fill" id="tfill" style="width:100%"></div></div>
+          <span class="timer-text" id="ttext">30:00</span>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th onclick="sort('date_filed')">日期</th>
+              <th onclick="sort('case_number')">案件号</th>
+              <th onclick="sort('plaintiff')">原告</th>
+              <th onclick="sort('state')">州</th>
+              <th onclick="sort('law_firm')">律所</th>
+              <th>品牌</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+            <tr class="empty-row"><td colspan="7"><span class="spinner"></span>加载中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <div class="pager-info" id="pinfo">—</div>
+        <div class="pager-btns" id="pbtns"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="side-card">
+      <div class="side-head">📰 侵权快讯</div>
+      <div class="side-body" id="news"></div>
+    </div>
+    <div class="side-card">
+      <div class="side-head">⚖️ 律所排行</div>
+      <div class="side-body" id="firms"></div>
+    </div>
+    <div class="side-card">
+      <div class="side-head">🏷️ 热门品牌</div>
+      <div class="side-body" id="brands"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 详情弹窗 -->
+<div class="modal-bg" id="modal-bg" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-top">
+      <div class="modal-ttl" id="modal-ttl">案件详情</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SL = { active:'进行中', pending:'待裁定', closed:'已结案' };
+let page=1, limit=20, total=0, sc='date_filed', sd='desc', cd=1800, cdt;
+let F = { q:'', year:'', state:'', firm:'', status:'' };
+
+const $ = id => document.getElementById(id);
+
+async function get(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+function fmt(d) { return d ? String(d).substring(0,10).replace(/-/g,'/') : '—'; }
+
+// ── 加载案件表格 ─────────────────────────────────
+async function loadCases() {
+  const p = new URLSearchParams({ ...F, page, limit, sort:sc, dir:sd });
+  for (const [k,v] of [...p]) if (!v) p.delete(k);
+  try {
+    const data = await get('/api/cases?' + p);
+    total = data.total;
+    $('case-count').textContent = data.total + ' 条';
+    const tp = Math.ceil(data.total / limit);
+    $('pinfo').textContent = `共 ${data.total} 条 · 第 ${page}/${tp} 页`;
+
+    const today = new Date().toISOString().split('T')[0];
+    $('tbody').innerHTML = data.data.length ? data.data.map((c,i) => {
+      const isNew = c.date_filed && String(c.date_filed).startsWith(today);
+      return `<tr style="animation-delay:${i*.018}s">
+        <td class="date-cell">${fmt(c.date_filed)}</td>
+        <td><button class="case-link" onclick="showDetail(${c.id})">${c.case_number}${isNew?'<span class="tag-new">NEW</span>':''}</button></td>
+        <td class="plaintiff-cell" title="${c.plaintiff}">${c.plaintiff||'—'}</td>
+        <td><span class="state-pill ${c.state}">${c.state}</span></td>
+        <td><span class="firm-pill ${c.law_firm}">${c.law_firm||'—'}</span></td>
+        <td class="brand-cell" title="${c.brand}">${c.brand||'—'}</td>
+        <td><span class="status-dot ${c.status}"></span><span style="font-size:11px;color:var(--text2)">${SL[c.status]||c.status}</span></td>
+      </tr>`;
+    }).join('') : '<tr class="empty-row"><td colspan="7">未找到匹配的案件</td></tr>';
+    renderPager(tp);
+  } catch(e) {
+    $('tbody').innerHTML = `<tr class="empty-row"><td colspan="7" style="color:var(--red)">⚠️ 连接失败: ${e.message}</td></tr>`;
+  }
+}
+
+function renderPager(tp) {
+  const pages = [];
+  if (tp <= 7) { for(let i=1;i<=tp;i++) pages.push(i); }
+  else {
+    pages.push(1);
+    if (page > 3) pages.push('…');
+    for (let i=Math.max(2,page-1); i<=Math.min(tp-1,page+1); i++) pages.push(i);
+    if (page < tp-2) pages.push('…');
+    pages.push(tp);
+  }
+  let h = `<button class="pager-btn" onclick="go(${page-1})" ${page===1?'disabled':''}>‹</button>`;
+  pages.forEach(p => { h += p==='…' ? '<span class="pager-btn" style="cursor:default">…</span>' : `<button class="pager-btn ${p===page?'active':''}" onclick="go(${p})">${p}</button>`; });
+  h += `<button class="pager-btn" onclick="go(${page+1})" ${page===tp?'disabled':''}>›</button>`;
+  $('pbtns').innerHTML = h;
+}
+
+function go(p) { const tp=Math.ceil(total/limit); if(p<1||p>tp) return; page=p; loadCases(); window.scrollTo({top:0,behavior:'smooth'}); }
+function changeLimit() { limit=parseInt($('f-limit').value); page=1; loadCases(); }
+function search() { F.q=$('q').value; F.year=$('f-year').value; F.state=$('f-state').value; F.firm=$('f-firm').value; F.status=$('f-status').value; page=1; loadCases(); }
+function reset() { $('q').value=''; ['f-year','f-state','f-firm','f-status'].forEach(id=>$(id).value=''); F={q:'',year:'',state:'',firm:'',status:''}; page=1; loadCases(); }
+function sort(col) { if(sc===col) sd=sd==='desc'?'asc':'desc'; else{sc=col;sd='desc';} page=1; loadCases(); }
+
+$('q').addEventListener('keydown', e => { if(e.key==='Enter') search(); });
+
+// ── 统计数据 ──────────────────────────────────────
+async function loadStats() {
+  try {
+    const s = await get('/api/stats');
+    $('s-today').textContent = s.today ?? '—';
+    $('s-month').textContent = s.this_month ?? '—';
+    $('s-total').textContent = s.total ?? '—';
+    $('syncing-badge').classList.toggle('show', !!s.syncing);
+    if (s.last_sync) {
+      const t = new Date(s.last_sync + 'Z').toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+      $('last-update').textContent = '更新: ' + t;
+    } else {
+      $('last-update').textContent = s.syncing ? '首次同步中...' : '等待同步';
+    }
+  } catch(e) { $('last-update').textContent = 'API离线'; }
+}
+
+// ── 律所排行 ──────────────────────────────────────
+async function loadFirms() {
+  try {
+    const rows = await get('/api/firms');
+    if (!rows.length) { $('firms').innerHTML = '<div style="color:var(--text3);font-size:11px;padding:8px 0">等待数据同步...</div>'; return; }
+    const max = rows[0].count || 1;
+    $('firms').innerHTML = rows.map(r => `
+      <div class="rank-row">
+        <span class="firm-pill ${r.law_firm}" style="min-width:44px;text-align:center">${r.law_firm||'其他'}</span>
+        <div class="rank-bar-wrap"><div class="rank-bar" style="width:${r.count/max*100}%"></div></div>
+        <span class="rank-count">${r.count}</span>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+// ── 品牌排行 ──────────────────────────────────────
+async function loadBrands() {
+  try {
+    const rows = await get('/api/brands');
+    if (!rows.length) { $('brands').innerHTML = '<div style="color:var(--text3);font-size:11px;padding:8px 0">等待数据同步...</div>'; return; }
+    $('brands').innerHTML = rows.map(r => `
+      <div class="rank-row">
+        <span class="rank-label">${r.brand}</span>
+        <span class="rank-count">${r.count}起</span>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+// ── 快讯（静态内容，可后续接CMS）────────────────────
+function loadNews() {
+  $('news').innerHTML = [
+    {d:'03/03/2026', t:'GBC律所就Fear of God再发两起TRO，涉跨境卖家账号冻结'},
+    {d:'03/02/2026', t:'BOSCH博世新增3起诉讼，主针对亚马逊仿冒电动工具'},
+    {d:'03/01/2026', t:'Keith律所版权类案件激增，多名艺术家申请冻结令'},
+    {d:'02/28/2026', t:'Nike单月TRO达历史新高，涉Air Jordan全系列侵权'},
+    {d:'02/25/2026', t:'IL法院2026 Q1占全美TRO案件42%，仍居首位'},
+  ].map(n=>`<div class="news-item"><div class="news-date">${n.d}</div><div class="news-title">${n.t}</div></div>`).join('');
+}
+
+// ── 案件详情弹窗 ──────────────────────────────────
+async function showDetail(id) {
+  $('modal-bg').classList.add('open');
+  $('modal-ttl').textContent = '加载中...';
+  $('modal-body').innerHTML = '<div style="text-align:center;padding:40px"><span class="spinner"></span></div>';
+  try {
+    const c = await get('/api/cases/' + id);
+    $('modal-ttl').textContent = '案件 ' + c.case_number;
+    $('modal-body').innerHTML = `
+      <div class="detail-grid">
+        <div class="d-item"><label>案件号</label><div class="v" style="font-family:'JetBrains Mono',monospace;color:var(--blue)">${c.case_number}</div></div>
+        <div class="d-item"><label>立案日期</label><div class="v">${fmt(c.date_filed)}</div></div>
+        <div class="d-item"><label>原告</label><div class="v">${c.plaintiff||'—'}</div></div>
+        <div class="d-item"><label>法院</label><div class="v">${c.court_id||'—'}</div></div>
+        <div class="d-item"><label>代理律所</label><div class="v"><span class="firm-pill ${c.law_firm}">${c.law_firm||'待确认'}</span></div></div>
+        <div class="d-item"><label>州</label><div class="v"><span class="state-pill ${c.state}">${c.state}</span></div></div>
+        <div class="d-item"><label>涉案品牌</label><div class="v" style="color:var(--accent)">${c.brand||'—'}</div></div>
+        <div class="d-item"><label>案件状态</label><div class="v"><span class="status-dot ${c.status}"></span>${SL[c.status]||c.status}</div></div>
+      </div>
+      <div class="detail-note">${c.case_name||'暂无详细描述'}</div>
+      ${c.source_url ? `<div style="margin:14px 0 0"><a href="${c.source_url}" target="_blank" rel="noopener" style="color:var(--blue);font-size:12px">🔗 在 CourtListener 查看完整案件文件 →</a></div>` : ''}
+      <div class="tip-box">💡 <strong style="color:var(--blue)">如何应对TRO？</strong> 收到冻结通知后请立即咨询跨境电商维权律师，在规定期限内提交 Motion to Dissolve TRO，可申请提供安全金方式解冻账户资金。</div>`;
+  } catch(e) {
+    $('modal-body').innerHTML = `<div style="color:var(--red);padding:20px">加载失败: ${e.message}</div>`;
+  }
+}
+function closeModal() { $('modal-bg').classList.remove('open'); }
+
+// ── 倒计时 ────────────────────────────────────────
+function startCountdown() {
+  cd = 1800; clearInterval(cdt);
+  cdt = setInterval(() => {
+    cd--;
+    const m = Math.floor(cd/60), s = cd%60;
+    const txt = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    $('s-next').textContent = txt;
+    $('ttext').textContent = txt;
+    $('tfill').style.width = (cd/1800*100) + '%';
+    if (cd <= 0) { refresh(); startCountdown(); }
+  }, 1000);
+}
+
+function toast(msg) {
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 3000);
+}
+
+async function refresh() {
+  await Promise.all([loadCases(), loadStats()]);
+  loadFirms(); loadBrands();
+  toast('✓ 数据已刷新');
+}
+
+// ── 初始化 ────────────────────────────────────────
+(async () => {
+  await Promise.all([loadCases(), loadStats()]);
+  loadNews(); loadFirms(); loadBrands();
+  startCountdown();
+
+  // 每60秒检查同步状态
+  setInterval(loadStats, 60000);
+})();
+</script>
+</body>
+</html>
